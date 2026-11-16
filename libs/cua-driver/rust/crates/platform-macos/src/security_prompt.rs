@@ -549,11 +549,11 @@ mod tests {
 
     #[test]
     fn the_system_consent_labels_include_allow_and_dont_allow() {
-        // Read from the OS's own tables; English must be among the languages.
+        // macOS 15's tables use only the typographic apostrophe for denial.
         let labels = consent_labels();
-        for label in ["Allow", "Don’t Allow", "Don't Allow"] {
+        for label in ["Allow", "Don't Allow"] {
             assert!(
-                labels.iter().any(|known| known == label),
+                labels.iter().any(|known| known.replace('’', "'") == label),
                 "{label} in {labels:?}"
             );
         }
