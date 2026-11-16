@@ -1147,11 +1147,29 @@ fn is_chromium_popup_owner(pid: i32) -> bool {
 }
 
 /// Whether pressing `element` would open a Chromium or Electron `<select>`
-/// menu: an `AXPopUpButton` inside web content of a Chromium renderer. The
-/// browser's own toolbar popups have no web-area ancestor and do not match.
+/// menu: an `AXPopUpButton` inside web content of a Chromium renderer, except
+/// an explicitly advertised in-page dialog. The browser's own toolbar popups
+/// have no web-area ancestor and do not match.
 pub(super) fn is_chromium_web_select(pid: i32, window_id: u32, element: AXUIElementRef) -> bool {
-    unsafe { copy_string_attr(element, "AXRole") }.as_deref() == Some("AXPopUpButton")
-        && is_chromium_popup_owner(pid)
+    let role = unsafe { copy_string_attr(element, "AXRole") };
+    let popup_value = unsafe { copy_string_attr(element, "AXPopupValue") };
+    // A real select exposes AXMenu/AXMenuItem children even when its ARIA
+    // popup type is overridden. Empty/failed child reads remain ambiguous.
+    let mut known_non_menu_children = false;
+    if role.as_deref() == Some("AXPopUpButton") && popup_value.as_deref() == Some("dialog") {
+        let children = unsafe { copy_children(element) };
+        known_non_menu_children = !children.is_empty();
+        for child in children {
+            let child_role = unsafe { copy_string_attr(child, "AXRole") };
+            known_non_menu_children &= matches!(child_role.as_deref(), Some(role) if role != "AXMenu" && role != "AXMenuItem");
+            unsafe { CFRelease(child as _) };
+        }
+    }
+    super::web_popup::may_open_native_select(
+        role.as_deref(),
+        popup_value.as_deref(),
+        known_non_menu_children,
+    ) && is_chromium_popup_owner(pid)
         && super::type_text::target_in_web_area(
             pid,
             Some((element as usize, None)),

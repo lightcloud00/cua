@@ -88,12 +88,30 @@ fn standalone_focus_gated_click_html() -> String {
   <span id="standalone-focus-gated-state" data-cua-id="standalone-focus-gated-state">
     activation=idle
   </span>
+  <button id="standalone-dialog-button" aria-haspopup="dialog" aria-expanded="false">
+    Open in-page dialog
+  </button>
+  <div id="standalone-dialog" role="dialog" aria-label="In-page dialog" hidden>
+    Dialog contents
+  </div>
+  <span id="standalone-dialog-state">dialog=closed</span>
+  <select id="standalone-native-select" aria-label="Native select guard">
+    <option>First</option><option>Second</option>
+  </select>
+  <select id="standalone-overridden-select" aria-label="Overridden select guard" aria-haspopup="dialog">
+    <option>First</option><option>Second</option>
+  </select>
 </fieldset>
 <script>
   document.getElementById('standalone-focus-gated').addEventListener('click', () => {
     if (document.hasFocus()) {
       document.getElementById('standalone-focus-gated-state').textContent = 'activation=accepted';
     }
+  });
+  document.getElementById('standalone-dialog-button').addEventListener('click', event => {
+    document.getElementById('standalone-dialog').hidden = false;
+    event.currentTarget.setAttribute('aria-expanded', 'true');
+    document.getElementById('standalone-dialog-state').textContent = 'dialog=open';
   });
 </script>
 </body>"#,
@@ -2672,6 +2690,55 @@ fn run_background_web_click_noop(spec: &BrowserSpec) {
                 plain.raw
             );
             wait_for_text(&fixture.server, "lbl-counter", "counter=1");
+
+            // Chromium exposes an aria-haspopup=dialog button as AXPopUpButton
+            // too. It must reach the page, while a real native select stays
+            // refused before opening a menu or changing window order.
+            let dialog = click(fixture, "Open in-page dialog");
+            assert!(!dialog.is_error(), "in-page dialog click: {}", dialog.raw);
+            assert_eq!(
+                dialog.action_route(),
+                Some("accessibility"),
+                "{}",
+                dialog.raw
+            );
+            wait_for_text(&fixture.server, "standalone-dialog-state", "dialog=open");
+
+            let select = click(fixture, "Native select guard");
+            assert!(
+                select.is_error(),
+                "native select must stay refused: {}",
+                select.raw
+            );
+            assert_eq!(
+                select.structured()["code"],
+                "select_menu_would_raise_window",
+                "{}",
+                select.raw
+            );
+            assert_eq!(
+                fixture.server.value("standalone-native-select").as_deref(),
+                Some("First")
+            );
+            let overridden = click(fixture, "Overridden select guard");
+            assert!(
+                overridden.is_error(),
+                "ARIA must not disable a real select guard: {}",
+                overridden.raw
+            );
+            assert_eq!(
+                overridden.structured()["code"],
+                "select_menu_would_raise_window",
+                "{}",
+                overridden.raw
+            );
+            assert_eq!(
+                fixture
+                    .server
+                    .value("standalone-overridden-select")
+                    .as_deref(),
+                Some("First")
+            );
 
             Observation::delivered(vec![OracleKind::FixtureState], Evidence::default())
         })
