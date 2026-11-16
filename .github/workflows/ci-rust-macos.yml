@@ -62,7 +62,7 @@ jobs:
     # Use the standard Intel pool while hosted ARM64 allocation is unavailable.
     # Native Apple Silicon desktop acceptance remains in the Lume harness.
     runs-on: macos-15-intel
-    timeout-minutes: 30
+    timeout-minutes: 60
     steps:
       - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
       - uses: dtolnay/rust-toolchain@4716b85f2fac3e324e64fa2810f6b5c3905760a5 # 1.97.1
