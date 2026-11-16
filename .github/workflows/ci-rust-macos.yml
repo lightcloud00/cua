@@ -57,7 +57,7 @@ jobs:
 
   unit:
     needs: quick
-    if: ${{ !failure() && !cancelled() && (!startsWith(github.head_ref, 'release-please--branches--')) && needs.quick.outputs.skip != 'true' }}
+    if: ${{ !failure() && !cancelled() && (needs.quick.result == 'success' || needs.quick.result == 'skipped') && (!startsWith(github.head_ref, 'release-please--branches--')) && needs.quick.outputs.skip != 'true' }}
     name: Rust macOS unit
     # Use the standard Intel pool while hosted ARM64 allocation is unavailable.
     # Native Apple Silicon desktop acceptance remains in the Lume harness.
